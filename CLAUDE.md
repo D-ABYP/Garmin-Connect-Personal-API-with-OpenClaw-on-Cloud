@@ -1,146 +1,101 @@
-# Garmin Connect MCP Server
+# Garmin Connect Personal API MCP
 
-MCP server para Garmin Connect en TypeScript. 61 tools para acceso a datos de fitness, salud y entrenamiento.
+Servidor MCP stdio para OpenClaw. Usa Garmin Connect Personal API y expone solamente cuatro tools de lectura.
 
----
-
-## 1. Estructura del Proyecto
+## 1. Estructura actual
 
 ```
 src/
-  index.ts              Entry point: MCP server + stdio transport
-  client/
-    garmin-auth.ts       Autenticacion SSO + OAuth1/OAuth2 (basado en python-garminconnect)
-    garmin.client.ts     Cliente con metodos para cada endpoint
-    index.ts             Barrel
-  constants/
-    garmin-endpoints.ts  URLs de la API de Garmin Connect
-    index.ts             Barrel
-  dtos/
-    date-params.dto.ts   Params de fecha (tipo + schema Zod)
-    activities.dto.ts    Params de actividades
-    devices.dto.ts       Params de dispositivos
-    index.ts             Barrel
+  index.ts                  Entrada stdio; registra solo tools Personal API
+  personal/
+    personal-api.ts         API Key, Obtain Token, Bearer, retries y errores
+    http-transport.ts       Transporte Axios inyectable
+    redaction.ts            Redaccion de secretos
+    cache.ts                Cache JSON por fecha y endpoint
+    normalize.ts            DTOs allowlist; elimina ubicacion y campos no publicos
+    data-service.ts         Cuatro contextos de datos
+    recovery.ts             Baselines y estado de sincronizacion
+    training.ts             Agregados semanales
+    activity.ts             Detalle de actividad sin GPS
+    *.test.ts               Tests offline con fixtures
   tools/
-    activities.tools.ts  Tools de actividades (12)
-    health.tools.ts      Tools de salud diaria (14)
-    trends.tools.ts      Tools de tendencias (4)
-    sleep.tools.ts       Tools de sueno (2)
-    body.tools.ts        Tools de composicion corporal (5)
-    performance.tools.ts Tools de performance y training (11)
-    profile.tools.ts     Tools de perfil y dispositivos (13)
-    index.ts             Barrel
+    personal.tools.ts       Cuatro tools read-only
+    personal.tools.test.ts  Contrato y protocolo MCP en memoria
+  client/                   LEGACY: referencia, no usado por la nueva entrada
+  constants/                LEGACY: referencia
+  dtos/                     LEGACY: referencia
+coach/
+  SKILL.md                  Workflows del coach y confirmacion de planes
+  *.example.yaml            Ejemplos ficticios
+  templates/                Reportes morning/evening
+scripts/
+  notify_email.py           SMTP stdlib, --test y reportes deduplicados
+tests/
+  test_*.py                 Tests Python sin SMTP real
 ```
 
----
+## 2. Reglas obligatorias
 
-## 2. DTOs: Tipo Explicito + Schema Zod
+- No usar email, password, SSO ni OAuth consumer de terceros.
+- Leer API Key solo de `~/.config/garmin/api_key` o `GARMIN_API_KEY_FILE`.
+- No aceptar la Key directamente como variable de entorno o argumento CLI.
+- No registrar tools de escritura ni llamar endpoints create/update/delete/download.
+- No devolver latitud, longitud, polyline, GPS, FIT ni ZIP.
+- Normalizar antes de escribir en cache o devolver datos.
+- No inventar datos: missing/error es `null` mas una entrada en `issues`.
+- MCP no genera recomendaciones; Claw interpreta los datos.
+- Consultar el Swagger oficial antes de agregar cualquier endpoint o campo.
+- Mantener el codigo legacy solo como referencia, nunca importarlo desde la nueva entrada.
 
-Cada DTO tiene un `type` explicito y un `schema` Zod paralelo. El tipo nunca se infiere del schema con `z.infer<>`.
+## 3. Autenticacion y red
 
-```typescript
-export type DateRangeParamDto = {
-  startDate: string;
-  endDate: string;
-};
+- Obtain Token: `POST /personalapitoken-service/personal-api/personal-api-key/token` con `Authorization: ApiKey`.
+- Host: `https://personal.connectapi.garmin.com`.
+- Bearer JWT con `exp`; refresh una hora antes y una sola renovacion tras 401.
+- Maximo tres intentos para timeout, red, 429 y 5xx; `Retry-After` y backoff limitado.
+- El unico POST permitido es Obtain Token; datos solamente con GET.
+- Logs por stderr, sin Authorization, response bodies, Key, token ni passwords.
 
-export const dateRangeParamSchema = z.object({
-  startDate: z.string().describe('Start date in YYYY-MM-DD format'),
-  endDate: z.string().describe('End date in YYYY-MM-DD format'),
-});
+## 4. Herramientas MCP
+
+- `get_recovery_context(date, baseline_days=28)`
+- `get_training_day_context(date, history_days=42)`
+- `get_training_history(start_date, end_date)` con 56–84 dias
+- `get_activity_details(activity_id)`
+
+Todas devuelven `{ meta, data, issues }`, con fechas, timezone, unidades y cache. HRV usa `unspecified_by_api` si Garmin no declara su unidad. Los timestamps de sueno aceptan strings ISO y numeros epoch en segundos o milisegundos; se normalizan a ISO.
+
+## 5. Cache local
+
+- Token: `~/.config/garmin/access_token.json`.
+- Datos: `~/.config/garmin/cache/`.
+- Dia actual: 10 minutos; dos dias anteriores: 6 horas; historia cerrada: larga duracion.
+- Actividades por dia, paginacion de 20 y deduplicacion por `activityId`.
+- Cache de datos con namespace SHA-256 de la Key; nunca compartir datos entre cuentas.
+- Escritura atomica y permisos `0600` en POSIX.
+- Paquete npm: incluir `build/`, `coach/` y `scripts/notify_email.py`; comprobar con `npm pack --dry-run`.
+
+## 6. Convenciones
+
+- TypeScript strict, ESM, Node 20+, Zod y Axios existentes.
+- Sin comentarios innecesarios en el codigo.
+- Imports locales sin extension; SDK externo con ruta completa `.js`.
+- `console.error()` para logging de servidores stdio.
+- No secretos reales en tests, fixtures, docs, logs o Git.
+- Python solo stdlib para el helper SMTP.
+
+## 7. Verificacion
+
+```bash
+npm test
+npm run typecheck
+npm run build
+python -m unittest discover -s tests -p "test_*.py"
+git diff --check
 ```
 
----
+Los tests no deben acceder a Garmin ni SMTP reales. El antiguo `src/client/garmin.client.test.ts` es live API y esta excluido del suite offline; conserva dos errores historicos de tipos que no pertenecen a la nueva implementacion.
 
-## 3. Tools MCP: Patron registerTool
+## 8. Entrega por fases
 
-Cada tool usa `server.registerTool` con config object e inputSchema usando `.shape` del Zod schema.
-
-```typescript
-server.registerTool(
-  'get_activities',
-  {
-    description: 'Get recent activities from Garmin Connect',
-    inputSchema: getActivitiesSchema.shape,
-  },
-  async ({ start, limit }) => {
-    const data = await client.getActivities(start ?? 0, limit ?? 20);
-    return {
-      content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
-    };
-  },
-);
-```
-
----
-
-## 4. Barrel Exports
-
-Cada carpeta tiene un `index.ts` que re-exporta todo. Los imports usan la carpeta, sin extension.
-
-```typescript
-export { GarminClient } from './garmin.client';
-```
-
-```typescript
-import { GarminClient } from './client';
-import { dateParamSchema } from '../dtos';
-```
-
----
-
-## 5. Convenciones de Nombrado
-
-| Patron | Convencion | Ejemplo |
-|--------|-----------|---------|
-| Clases | PascalCase | `GarminClient` |
-| Variables/funciones | camelCase | `getActivities`, `todayString` |
-| Archivos | kebab-case | `garmin.client.ts`, `date-params.dto.ts` |
-| Constantes | UPPERCASE | `DAILY_HEART_RATE_ENDPOINT` |
-| Booleanos | Prefijo `is/has` | `isAuthenticated` |
-| Funciones | Empiezan con verbo | `getSteps`, `ensureAuthenticated` |
-| DTOs tipo | `{Verbo}{Algo}Dto` | `GetActivitiesDto` |
-| DTOs schema | `{verbo}{Algo}Schema` | `getActivitiesSchema` |
-| Tools files | `{categoria}.tools.ts` | `health.tools.ts` |
-| Register functions | `register{Cat}Tools` | `registerHealthTools` |
-
----
-
-## 6. Stack Tecnico
-
-| Componente | Eleccion |
-|------------|----------|
-| Runtime | Node.js 20+ |
-| Lenguaje | TypeScript (strict) |
-| MCP SDK | `@modelcontextprotocol/sdk` |
-| HTTP Client | `axios` + `tough-cookie` |
-| OAuth | `oauth-1.0a` (HMAC-SHA1) |
-| Validacion | `zod` |
-| Transport | stdio |
-| Build | `tsup` (ESM, node20 target) |
-| Module Resolution | Bundler (sin extensiones .js en imports) |
-
----
-
-## 7. Autenticacion
-
-Flujo basado en `python-garminconnect` (cyberjunky) via `garth`:
-
-1. Fetch OAuth consumer credentials desde S3
-2. SSO login (embed → signin → POST credentials → extract ticket)
-3. Exchange ticket → OAuth1 token (HMAC-SHA1 signed)
-4. Exchange OAuth1 → OAuth2 token (Bearer)
-5. Auto-refresh OAuth2 en 401 usando OAuth1
-6. Tokens persistidos en `~/.garmin-mcp/` (oauth1_token.json, oauth2_token.json)
-
----
-
-## 8. Reglas
-
-- Sin comentarios en el codigo
-- Imports locales sin extension (`.js` ni `.ts`)
-- Imports de librerias externas con su path completo (`@modelcontextprotocol/sdk/server/mcp.js`)
-- `console.error()` para logging (nunca `console.log` en servidores stdio)
-- Autenticacion via env vars `GARMIN_EMAIL` y `GARMIN_PASSWORD`
-- Tokens cacheados en `~/.garmin-mcp/`
-- Retry automatico con re-auth si un request falla con 401
+Despues de cada fase: ejecutar tests y build, mostrar archivos cambiados, diferencias clave, resultados, problemas pendientes y scans de secretos/escritura/endpoints. No continuar a la siguiente fase hasta confirmacion del usuario.

@@ -1,0 +1,22 @@
+plan_id: "example-half-marathon-plan"
+status: "draft"
+goal:
+  event: "Example Half Marathon"
+  date: "2027-04-18"
+  target: "finish"
+weeks:
+  - week_start: "2027-03-22"
+    focus: "base"
+    sessions:
+      - day: "TUESDAY"
+        type: "easy_run"
+        duration_minutes: 45
+      - day: "THURSDAY"
+        type: "steady_run"
+        duration_minutes: 50
+      - day: "SUNDAY"
+        type: "long_run"
+        duration_minutes: 90
+confirmation:
+  required_before_long_term_changes: true
+  require_visible_diff: true
