@@ -10,4 +10,4 @@ export { registerSnapshotTools } from './snapshot.tools';
 export { registerTrainingTools } from './training.tools';
 export { registerWellnessTools } from './wellness.tools';
 export { registerChallengeTools } from './challenges.tools';
-export { registerWriteTools } from './write.tools';
+export { registerPersonalTools } from './personal.tools';

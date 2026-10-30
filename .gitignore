@@ -2,3 +2,10 @@ node_modules/
 build/
 *.tsbuildinfo
 .env
+.garmin/
+api_key
+access_token.json
+email.env
+notify-state.json*
+__pycache__/
+*.py[cod]

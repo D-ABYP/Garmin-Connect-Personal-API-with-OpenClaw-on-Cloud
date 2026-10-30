@@ -1,0 +1,13 @@
+athlete:
+  display_name: "Example Athlete"
+  timezone: "Asia/Shanghai"
+  measurement_system: "metric"
+  experience_level: "intermediate"
+  available_days:
+    - "TUESDAY"
+    - "THURSDAY"
+    - "SATURDAY"
+    - "SUNDAY"
+  max_weekly_duration_minutes: 360
+  preferred_long_training_day: "SUNDAY"
+  notes: "Fictional profile for configuration testing only"
