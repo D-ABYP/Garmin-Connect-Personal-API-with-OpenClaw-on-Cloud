@@ -111,7 +111,7 @@ openclaw mcp doctor garmin --probe
 
 - 每个数据项独立处理错误；失败或缺失为 `null`，不会用零值编造。
 - 只有整周读取成功且没有活动时，空训练周才使用真实的零计数；读取失败的空周及其聚合返回 `null`，并标记 `complete=false` 和 `missingDays`。
-- HRV 单位在官方 Schema 中未声明，因此标为 `unspecified_by_api`。
+- HRV 数值单位统一标为毫秒（`ms`）。
 - Personal API 不提供活动心率/配速时间序列时，对应字段为 `null` 并带有 `unsupported_field` 问题。
 - 活动详情的 HR 区间来自同一活动 ID 的官方活动列表摘要。
 

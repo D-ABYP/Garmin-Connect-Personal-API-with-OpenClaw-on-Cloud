@@ -176,7 +176,7 @@ export const RESPONSE_UNITS: Record<string, string> = {
   pace: 'seconds_per_kilometer',
   elevation: 'meters',
   heartRate: 'beats_per_minute',
-  hrv: 'unspecified_by_api',
+  hrv: 'ms',
   sleep: 'seconds',
   bodyBattery: 'score_5_100',
   stress: 'score_0_100',

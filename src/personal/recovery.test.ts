@@ -86,6 +86,7 @@ describe('PersonalDataService.getRecoveryContext', () => {
     const result = await dataService.getRecoveryContext(DATE, 3);
 
     expect(result.meta).toMatchObject({ date: DATE, startDate: '2026-10-27', endDate: DATE, timezone: 'Asia/Shanghai' });
+    expect(result.meta.units.hrv).toBe('ms');
     expect(result.data.sleep).toMatchObject({ sleepTimeSeconds: 25_200 });
     expect(result.data.hrv).toMatchObject({ lastNightAvg: 55 });
     expect(result.data.history.sleep).toHaveLength(3);

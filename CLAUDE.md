@@ -63,7 +63,7 @@ tests/
 - `get_training_history(start_date, end_date)` con 56–84 dias
 - `get_activity_details(activity_id)`
 
-Todas devuelven `{ meta, data, issues }`, con fechas, timezone, unidades y cache. HRV usa `unspecified_by_api` si Garmin no declara su unidad. Los timestamps de sueno aceptan strings ISO y numeros epoch en segundos o milisegundos; se normalizan a ISO.
+Todas devuelven `{ meta, data, issues }`, con fechas, timezone, unidades y cache. HRV usa milisegundos (`ms`). Los timestamps de sueno aceptan strings ISO y numeros epoch en segundos o milisegundos; se normalizan a ISO.
 
 ## 5. Cache local
 
