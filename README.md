@@ -1,6 +1,7 @@
 # Garmin Connect Personal API MCP
 
 面向单用户 OpenClaw / Kimi Claw 的 Garmin 只读数据服务。通过 stdio 提供四个 MCP 工具，并附带教练 Skill、上午/睡前报告模板和邮件辅助脚本。
+声明：基于Nicolasvegam/garmin-connect-mcp项目(原项目链接：https://github.com/Nicolasvegam/garmin-connect-mcp)，利用Garmin Connect Personal API和相关文件，部分重写项目。
 
 ## 安全边界
 
